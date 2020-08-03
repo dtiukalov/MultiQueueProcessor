@@ -13,11 +13,7 @@
 template <typename Key, typename Value>
 class Worker {
 public:
-    Worker(): 
-    m_que(nullptr),
-    m_consumer(nullptr),
-    m_working(false)
-    {}
+    Worker() {}
 
     Worker(const Worker&) = delete;
     Worker& operator=(const Worker&) = delete;
@@ -26,7 +22,7 @@ public:
         std::exchange(m_que, other.m_que);
         std::exchange(m_consumer, other.m_consumer);
         m_thread = std::move(other.m_thread);
-        m_working.exchange(other.m_working);
+        m_working.exchange(other.m_working, std::memory_order_relaxed);
         m_id = other.m_id;
     }
     Worker& operator=(Worker&& other) noexcept
@@ -41,7 +37,7 @@ public:
         other.m_consumer = nullptr;
 
         m_thread = std::move(other.m_thread);
-        m_working.exchange(other.m_working);
+        m_working.exchange(other.m_working, std::memory_order_relaxed);
         m_id = other.m_id;
 
         return *this;
@@ -55,7 +51,7 @@ public:
     }
 
     void execute(Key id, const ConsumerSharedPtr<Key, Value>& consumer, Queue<Value>& queue) {
-        bool executed = m_working.exchange(true);
+        bool executed = m_working.exchange(true, std::memory_order_relaxed);
         if (executed)
             return;
 
@@ -67,7 +63,7 @@ public:
     }
 
     void stopProcessing() {
-        m_working.exchange(false);
+        m_working.exchange(false, std::memory_order_relaxed);
     }
 
 private:
@@ -88,9 +84,9 @@ private:
 
     Key m_id;
 
-    Queue<Value>* m_que;
-    AbstractConsumer<Key, Value>* m_consumer;
+    Queue<Value>* m_que = nullptr;
+    AbstractConsumer<Key, Value>* m_consumer = nullptr;
     
-    std::atomic<bool> m_working;
+    std::atomic<bool> m_working = false;
     std::thread m_thread;
 };
